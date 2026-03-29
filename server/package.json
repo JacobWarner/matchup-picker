@@ -6,7 +6,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:integration": "vitest run tests/matchup.integration.test.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

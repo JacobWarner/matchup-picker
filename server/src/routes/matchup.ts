@@ -67,25 +67,42 @@ router.post("/", async (req: Request, res: Response) => {
 
     const uggLane = LANE_MAP[lane];
     const uggRank = RANK_MAP[rank];
-    const enemyUggName = toUggName(enemyId);
+    const enemyNormalized = normalizeChampionName(champions[enemyId].name);
 
-    const [counterData, ...buildResults] = await Promise.all([
-      scrapeCounterPage(enemyUggName, uggLane, uggRank),
+    // Scrape each POOL CHAMPION's counter page (not the enemy's).
+    // The enemy's counter page only lists champions commonly played in that role,
+    // so off-meta picks (e.g. Swain bot) would be missing. By scraping each pool
+    // champion's page, we find the enemy in THEIR matchup lists instead.
+    const scrapeResults = await Promise.all([
+      ...poolIds.map((id) => scrapeCounterPage(toUggName(id), uggLane, uggRank)),
       ...poolIds.map((id) => scrapeBuildPage(toUggName(id), uggLane, uggRank)),
     ]);
 
+    const counterResults = scrapeResults.slice(0, poolIds.length) as Awaited<ReturnType<typeof scrapeCounterPage>>[];
+    const buildResults = scrapeResults.slice(poolIds.length) as Awaited<ReturnType<typeof scrapeBuildPage>>[];
+
     const results: MatchupResult[] = poolIds.map((id, i) => {
       const champName = champions[id].name;
-      const normalized = normalizeChampionName(champName);
-      const counter = counterData[normalized] ?? null;
+      const counterData = counterResults[i];
+      const enemyEntry = counterData[enemyNormalized] ?? null;
       const build = buildResults[i];
-      const gamesPlayed = counter?.gamesPlayed ?? null;
+      const gamesPlayed = enemyEntry?.gamesPlayed ?? null;
+
+      // Counter page shows stats from the OPPONENT's perspective:
+      // "Best Picks vs Swain" shows opponents that beat Swain, with the opponent's WR.
+      // So we invert: poolChampWR = 100 - enemyWR, and poolChampGD = -enemyGD.
+      const winRate = enemyEntry?.winRate != null
+        ? Math.round((100 - enemyEntry.winRate) * 100) / 100
+        : null;
+      const goldDiff15 = enemyEntry?.goldDiff15 != null
+        ? -enemyEntry.goldDiff15
+        : null;
 
       return {
         champion: champName,
         championId: id,
-        winRate: counter?.winRate ?? null,
-        goldDiff15: counter?.goldDiff15 ?? null,
+        winRate,
+        goldDiff15,
         gamesPlayed,
         tier: build.tier,
         pickRate: build.pickRate,
