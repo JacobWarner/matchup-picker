@@ -1,7 +1,11 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import matchupRouter from "./routes/matchup.js";
 import { closeBrowser } from "./scraper/browser.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 app.use(cors());
@@ -12,6 +16,13 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/matchup", matchupRouter);
+
+// In production, serve the built React frontend
+const clientDist = path.join(__dirname, "../../client/dist");
+app.use(express.static(clientDist));
+app.get("*", (_req, res) => {
+  res.sendFile(path.join(clientDist, "index.html"));
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

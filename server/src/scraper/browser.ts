@@ -10,7 +10,15 @@ export function getBrowser(): Promise<Browser> {
     browserPromise = chromium
       .launch({
         headless: true,
-        args: ["--disable-blink-features=AutomationControlled"],
+        args: [
+          "--disable-blink-features=AutomationControlled",
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--disable-extensions",
+          "--disable-background-networking",
+        ],
       })
       .catch((err) => {
         browserPromise = null;

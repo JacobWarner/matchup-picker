@@ -1,6 +1,5 @@
 import { createContext } from "./browser.js";
 import { withThrottle } from "./throttle.js";
-import { parseWinRate, parseGames, parseGoldDiff } from "./parseUtils.js";
 import { normalizeChampionName } from "../champions.js";
 
 export interface CounterPageData {
