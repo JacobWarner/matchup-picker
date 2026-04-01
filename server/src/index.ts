@@ -20,7 +20,7 @@ app.use("/api/matchup", matchupRouter);
 // In production, serve the built React frontend
 const clientDist = path.join(__dirname, "../../client/dist");
 app.use(express.static(clientDist));
-app.get("*", (_req, res) => {
+app.get("/{*splat}", (_req, res) => {
   res.sendFile(path.join(clientDist, "index.html"));
 });
 
