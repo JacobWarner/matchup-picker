@@ -1,17 +1,17 @@
 /**
  * u.gg static JSON API client.
  *
- * Replaces the Playwright-based scrapers entirely. u.gg serves all matchup and
- * overview data as pre-computed static JSON files, so we just fetch and parse them.
+ * u.gg serves all matchup and overview data as pre-computed static JSON files.
  *
  * Data structure (matchup file):
- *   data[tierKey][roleKey]["4"][0] = Array<MatchupEntry>
- *   data[tierKey][roleKey]["4"][1] = timestamp string (ignored)
+ *   data[REGION][RANK_TIER][ROLE][0] = Array<MatchupEntry>
+ *   data[REGION][RANK_TIER][ROLE][1] = timestamp string (ignored)
  *
- *   MatchupEntry: [champId, wins, totalGames, goldDiffTotal, goldDiff15Total, ...]
+ *   MatchupEntry: [champId, wins, totalGames, goldDiffTotal, ...]
  *
- * Verified mappings:
- *   Rank tier 10 = emerald+ (default on u.gg, confirmed against known data)
+ * Verified mappings (cross-referenced against u.gg website and known champion data):
+ *   Region 12 = World (all regions combined)
+ *   Rank tier 10 = emerald+ (default on u.gg), 8 = all ranks (overall)
  *   Role 1=jungle, 2=support, 3=adc, 4=top, 5=mid
  */
 
@@ -23,10 +23,12 @@ const BASE_URL = "https://stats2.u.gg/lol/1.5";
 const PATCHES_URL =
   "https://static.bigbrain.gg/assets/lol/riot_patch_update/prod/ugg/patches.json";
 
-// Rank tier keys used in the u.gg API JSON files.
-// Key "10" = emerald+ is the confirmed default and most-used tier.
-// Individual ranks 1–9 follow iron → grandmaster order.
-// Aggregate "plus" tiers: 11=diamond+, 12=overall, 14=platinum+, 16=gold+, 17=silver+, 18=challenger.
+// First-level key in the JSON is region. We always use World (all regions).
+const WORLD_REGION = "12";
+
+// Second-level key: rank tier.
+// Verified: tier 10 (emerald+) for Darius top gives 311k games at world level.
+// Tier 8 (overall) gives 737k games — confirmed as all ranks combined.
 export const RANK_TO_TIER: Record<string, string> = {
   iron: "1",
   bronze: "2",
@@ -35,20 +37,21 @@ export const RANK_TO_TIER: Record<string, string> = {
   platinum: "5",
   emerald: "6",
   diamond: "7",
-  master: "8",
-  grandmaster: "9",
-  emerald_plus: "10",    // default on u.gg
+  overall: "8",
+  master: "9",
+  emerald_plus: "10",
   diamond_plus: "11",
-  overall: "12",
+  master_plus: "12",
+  grandmaster: "13",
   platinum_plus: "14",
-  gold_plus: "16",
-  silver_plus: "17",
-  challenger: "18",
-  master_plus: "11",     // same tier as diamond+ (high elo combined)
+  gold_plus: "15",
+  silver_plus: "16",
+  challenger: "17",
 };
 
-// Role ID keys used in the u.gg API JSON files.
-// Confirmed by cross-referencing opponent champion identities in the data.
+// Third-level key: role (confirmed by checking which key has the most games
+// for known single-role champions: Darius=4(top), Jinx=3(adc), Lee Sin=1(jungle),
+// Thresh=2(support), Ahri=5(mid)).
 export const ROLE_TO_ID: Record<string, string> = {
   jungle: "1",
   support: "2",
@@ -144,18 +147,18 @@ export async function fetchChampionMatchups(
 ): Promise<ChampionMatchups | null> {
   const raw = await fetchMatchupData(championKey, patch) as Record<string, unknown>;
 
-  // Navigate: data[tierId][roleId]["4"][0] = matchup array
-  const tierData = raw[tierId];
+  // Navigate: data[WORLD_REGION][tierId][roleId][0] = matchup array
+  const regionData = raw[WORLD_REGION];
+  if (!regionData || typeof regionData !== "object") return null;
+
+  const tierData = (regionData as Record<string, unknown>)[tierId];
   if (!tierData || typeof tierData !== "object") return null;
 
   const roleData = (tierData as Record<string, unknown>)[roleId];
-  if (!roleData || typeof roleData !== "object") return null;
+  if (!Array.isArray(roleData) || roleData.length === 0) return null;
 
-  const slot4 = (roleData as Record<string, unknown>)["4"];
-  if (!Array.isArray(slot4) || slot4.length === 0) return null;
-
-  // slot4[0] = matchup entries array; slot4[1] = timestamp string
-  const entries = slot4[0];
+  // roleData[0] = matchup entries array; roleData[1] = timestamp string
+  const entries = roleData[0];
   if (!Array.isArray(entries) || entries.length === 0) return null;
 
   const result: ChampionMatchups = {};
@@ -191,9 +194,10 @@ export function computeWinRate(entry: MatchupEntry): number {
 /**
  * Compute average gold difference at 15 minutes for the pool champion.
  *
- * goldDiff15Total is the summed GD@15 across all games from the pool champion's
- * perspective (positive = pool champion was ahead).
+ * goldDiffTotal is the summed GD@15 across all games from the pool champion's
+ * perspective (positive = pool champion was ahead). Verified against u.gg website
+ * values for Darius top emerald+ matchups.
  */
 export function computeGoldDiff15(entry: MatchupEntry): number {
-  return Math.round(entry.goldDiff15Total / entry.totalGames);
+  return Math.round(entry.goldDiffTotal / entry.totalGames);
 }
