@@ -140,7 +140,7 @@ router.post("/", async (req: Request, res: Response) => {
     } else if (message.includes("page structure may have changed")) {
       res.status(502).json({ error: message });
     } else {
-      res.status(500).json({ error: "Failed to fetch matchup data. Try again later." });
+      res.status(500).json({ error: `Failed to fetch matchup data: ${message}` });
     }
   }
 });

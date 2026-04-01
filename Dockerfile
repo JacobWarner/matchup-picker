@@ -27,7 +27,9 @@ COPY --from=client-build /app/client/dist ./client/dist
 COPY server/package.json server/package-lock.json* ./server/
 WORKDIR /app/server
 RUN npm install --omit=dev
-RUN npx playwright install chromium
+
+# Use the Chromium that comes with the base image
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Copy compiled server
 COPY --from=server-build /app/server/dist ./dist
