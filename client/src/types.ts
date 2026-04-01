@@ -37,8 +37,6 @@ export const RANKS = [
   { label: "Master", value: "master" },
   { label: "Grandmaster", value: "grandmaster" },
   { label: "Challenger", value: "challenger" },
-  { label: "Silver+", value: "silver_plus" },
-  { label: "Gold+", value: "gold_plus" },
   { label: "Platinum+", value: "platinum_plus" },
   { label: "Emerald+", value: "emerald_plus" },
   { label: "Diamond+", value: "diamond_plus" },

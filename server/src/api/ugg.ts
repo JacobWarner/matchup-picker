@@ -35,23 +35,23 @@ const WORLD_REGION = "12";
 //   master_plus page shows 44.84% WR → matches rank 14 in JSON
 //   overall page shows 51.08% WR → matches rank 8 in JSON
 export const RANK_TO_TIER: Record<string, string> = {
-  iron: "1",
-  bronze: "2",
-  silver: "3",
-  gold: "4",
-  platinum: "5",
-  emerald: "6",
-  diamond: "7",
+  // Individual ranks — verified by matching first-counter WR on u.gg for each rank selection
+  challenger: "1",
+  master: "2",
+  diamond: "3",
+  platinum: "4",
+  gold: "5",
+  silver: "6",
+  bronze: "7",
+  iron: "12",
+  grandmaster: "13",
+  emerald: "16",
+  // Aggregated "plus" tiers — verified against u.gg website WR values
   overall: "8",
   platinum_plus: "10",
   diamond_plus: "11",
-  master: "12",
-  grandmaster: "13",
   master_plus: "14",
-  gold_plus: "15",
-  silver_plus: "16",
-  emerald_plus: "17",
-  challenger: "13",       // grandmaster+ data (challenger alone is too sparse)
+  emerald_plus: "17",     // u.gg default
 };
 
 // Third-level key: role (confirmed by checking which key has the most games
@@ -192,23 +192,29 @@ export async function fetchChampionMatchups(
 /**
  * Compute win rate for the pool champion against a specific enemy.
  *
- * The matchup file stores data from the pool champion's perspective:
- * entry.wins = number of times the pool champion won vs this enemy.
- * So WR = wins / totalGames directly (no inversion needed).
+ * IMPORTANT: The matchup file stores data from the OPPONENT's perspective.
+ * Verified: Darius's file has Garen at 48.56% (= Garen's WR vs Darius).
+ *           Garen's file has Darius at 51.46% (= Darius's WR vs Garen).
+ *           4287 + 4543 ≈ 8828 total games — complementary.
+ *
+ * So we invert: poolChampWR = 100 - fileWR.
  */
 export function computeWinRate(entry: MatchupEntry): number {
-  return Math.round((entry.wins / entry.totalGames) * 10000) / 100;
+  const opponentWR = (entry.wins / entry.totalGames) * 100;
+  return Math.round((100 - opponentWR) * 100) / 100;
 }
 
 /**
  * Compute average gold difference at 15 minutes for the pool champion.
  *
- * goldDiffTotal is the summed GD@15 across all games from the pool champion's
- * perspective (positive = pool champion was ahead). Verified against u.gg website
- * values for Darius top emerald+ matchups.
+ * The file stores GD@15 from the opponent's perspective (verified: Darius's file
+ * shows -550 for Garen, meaning Garen is 550g behind — but u.gg displays this
+ * as -550 on Darius's counter page from Garen's perspective).
+ *
+ * We invert so positive = pool champion is ahead.
  */
 export function computeGoldDiff15(entry: MatchupEntry): number {
-  return Math.round(entry.goldDiff15Total / entry.totalGames);
+  return Math.round(-entry.goldDiff15Total / entry.totalGames);
 }
 
 // ---------------------------------------------------------------------------

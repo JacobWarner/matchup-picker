@@ -68,17 +68,29 @@ describe("Data access pattern (region/rank/role)", () => {
   }, 15000);
 });
 
-describe("Win rate and gold diff computation", () => {
-  it("GD@15 uses field[4] (verified: Darius vs Garen emerald+ = -550)", async () => {
+describe("Win rate and gold diff computation (inverted from file perspective)", () => {
+  it("Darius WR vs Garen is ~51% (Darius favored)", async () => {
+    const patch = await getCurrentPatch();
+    const matchups = await fetchChampionMatchups("122", ROLE_TO_ID.top, RANK_TO_TIER.emerald_plus, patch);
+
+    const garen = matchups![86];
+    const wr = computeWinRate(garen);
+    // File stores opponent (Garen's) wins. computeWinRate inverts.
+    // Verified: Darius beats Garen ~51.4%, Garen's file confirms Darius at ~51.5%
+    expect(wr).toBeGreaterThan(50);
+    expect(wr).toBeLessThan(55);
+  }, 15000);
+
+  it("Darius GD@15 vs Garen is positive (Darius ahead at 15)", async () => {
     const patch = await getCurrentPatch();
     const matchups = await fetchChampionMatchups("122", ROLE_TO_ID.top, RANK_TO_TIER.emerald_plus, patch);
 
     const garen = matchups![86];
     const gd = computeGoldDiff15(garen);
-    // Darius vs Garen should have negative GD@15 (Garen counters Darius)
-    // Verified against u.gg counter page: -550 on 2026-03-31
-    expect(gd).toBeLessThan(0);
-    expect(gd).toBeGreaterThan(-2000);
+    // File stores opponent's GD. computeGoldDiff15 inverts.
+    // Verified: u.gg shows Garen at -550 GD@15 → Darius is +550 ahead
+    expect(gd).toBeGreaterThan(0);
+    expect(gd).toBeLessThan(2000);
   }, 15000);
 });
 

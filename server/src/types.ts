@@ -41,8 +41,6 @@ export const RANK_MAP: Record<string, true> = {
   diamond_plus: true,
   emerald_plus: true,
   platinum_plus: true,
-  gold_plus: true,
-  silver_plus: true,
   overall: true,
 };
 
