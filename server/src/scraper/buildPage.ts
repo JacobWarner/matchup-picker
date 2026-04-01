@@ -19,7 +19,7 @@ export async function scrapeBuildPage(
       const page = await context.newPage();
       const url = `https://u.gg/lol/champions/${championUggName}/build?role=${lane}&rank=${rank}`;
 
-      const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
+      const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
 
       if (!response) {
         throw new Error(`No response from u.gg build page for ${championUggName}`);
@@ -40,7 +40,7 @@ export async function scrapeBuildPage(
       }
 
       try {
-        await page.waitForSelector('div[class*="grid"]', { timeout: 10000 });
+        await page.waitForSelector('div[class*="grid"]', { timeout: 30000 });
       } catch {
         throw new Error(
           `Build page for ${championUggName} did not render stats grid within 10s. ` +

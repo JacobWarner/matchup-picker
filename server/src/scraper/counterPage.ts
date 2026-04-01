@@ -22,7 +22,7 @@ export async function scrapeCounterPage(
       const page = await context.newPage();
       const url = `https://u.gg/lol/champions/${enemyUggName}/counter?role=${lane}&rank=${rank}`;
 
-      const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
+      const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
 
       if (!response) {
         throw new Error(`No response from u.gg counter page for ${enemyUggName}`);
@@ -43,7 +43,7 @@ export async function scrapeCounterPage(
       }
 
       try {
-        await page.waitForSelector('a[href*="/lol/champions/"][href*="/build"]', { timeout: 10000 });
+        await page.waitForSelector('a[href*="/lol/champions/"][href*="/build"]', { timeout: 30000 });
       } catch {
         throw new Error(
           `Counter page for ${enemyUggName} did not render expected content within 10s. ` +

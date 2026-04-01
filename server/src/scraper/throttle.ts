@@ -1,5 +1,5 @@
-// Keep concurrency low — Render free tier has 512MB RAM, Chromium is heavy
-const MAX_CONCURRENT = 2;
+// One page at a time — Render free tier has 512MB RAM, Chromium is heavy
+const MAX_CONCURRENT = 1;
 const DELAY_MS = 300;
 
 let active = 0;
