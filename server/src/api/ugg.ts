@@ -102,12 +102,12 @@ export async function getCurrentPatch(): Promise<string> {
 // Raw data fetchers
 // ---------------------------------------------------------------------------
 
-async function fetchMatchupData(championKey: string, patch: string): Promise<unknown> {
-  const url = `${BASE_URL}/matchups/${patch}/ranked_solo_5x5/${championKey}/1.5.0.json`;
+async function fetchJsonData(endpoint: string, championKey: string, patch: string): Promise<unknown> {
+  const url = `${BASE_URL}/${endpoint}/${patch}/ranked_solo_5x5/${championKey}/1.5.0.json`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(
-      `u.gg matchup data returned HTTP ${res.status} for champion ${championKey}`
+      `u.gg ${endpoint} data returned HTTP ${res.status} for champion ${championKey}`
     );
   }
   return res.json();
@@ -149,7 +149,7 @@ export async function fetchChampionMatchups(
   tierId: string,
   patch: string
 ): Promise<ChampionMatchups | null> {
-  const raw = await fetchMatchupData(championKey, patch) as Record<string, unknown>;
+  const raw = await fetchJsonData("matchups", championKey, patch) as Record<string, unknown>;
 
   // Navigate: data[WORLD_REGION][tierId][roleId][0] = matchup array
   const regionData = raw[WORLD_REGION];
@@ -209,4 +209,67 @@ export function computeWinRate(entry: MatchupEntry): number {
  */
 export function computeGoldDiff15(entry: MatchupEntry): number {
   return Math.round(entry.goldDiff15Total / entry.totalGames);
+}
+
+// ---------------------------------------------------------------------------
+// Rankings (tier, pick rate, ban rate)
+// ---------------------------------------------------------------------------
+
+export interface RankingData {
+  tier: string;
+  pickRate: number;
+  banRate: number;
+}
+
+/**
+ * Fetch ranking data for a champion (tier, pick rate, ban rate).
+ *
+ * Rankings JSON fields (verified against u.gg build page for Darius top emerald+):
+ *   [0] = wins, [1] = total games, [2] = rank position, [3] = total champs in role
+ *   [13] = total role appearances (denominator for pick rate)
+ *   [19] = ban count (divide by total_games_played for ban rate)
+ *
+ * Pick rate = field[1] / field[13] — verified: 146599/2222992 = 6.6% (u.gg shows 6.5%)
+ * Ban rate = field[19] / (field[13]/2) — verified: 162096/1111496 = 14.6% (u.gg shows 14.2%)
+ * Tier = derived from rank position / total champs ratio
+ */
+export async function fetchChampionRankings(
+  championKey: string,
+  roleId: string,
+  tierId: string,
+  patch: string
+): Promise<RankingData | null> {
+  const raw = await fetchJsonData("rankings", championKey, patch) as Record<string, unknown>;
+
+  const regionData = raw[WORLD_REGION];
+  if (!regionData || typeof regionData !== "object") return null;
+
+  const tierData = (regionData as Record<string, unknown>)[tierId];
+  if (!tierData || typeof tierData !== "object") return null;
+
+  const roleData = (tierData as Record<string, unknown>)[roleId];
+  if (!roleData || typeof roleData !== "object") return null;
+
+  const r = roleData as Record<string, number>;
+  const totalGames = r["1"];
+  const rank = r["2"];
+  const totalChamps = r["3"];
+  const totalRoleAppearances = r["13"];
+  const banCount = r["19"];
+
+  if (!totalGames || !totalChamps || !totalRoleAppearances) return null;
+
+  const pickRate = Math.round((totalGames / totalRoleAppearances) * 1000) / 10;
+  const banRate = Math.round((banCount / (totalRoleAppearances / 2)) * 1000) / 10;
+
+  const pct = rank / totalChamps;
+  let tier: string;
+  if (pct <= 0.03) tier = "S+";
+  else if (pct <= 0.08) tier = "S";
+  else if (pct <= 0.20) tier = "A";
+  else if (pct <= 0.40) tier = "B";
+  else if (pct <= 0.65) tier = "C";
+  else tier = "D";
+
+  return { tier, pickRate, banRate };
 }

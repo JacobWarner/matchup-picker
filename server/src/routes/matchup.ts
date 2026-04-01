@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import {
   fetchChampionMatchups,
+  fetchChampionRankings,
   computeWinRate,
   computeGoldDiff15,
   getCurrentPatch,
@@ -82,21 +83,24 @@ router.post("/", async (req: Request, res: Response) => {
       ? req.body.patch
       : await getCurrentPatch();
 
-    // Fetch matchup data for each pool champion concurrently
-    const matchupResults = await Promise.all(
-      poolIds.map((id) =>
-        fetchChampionMatchups(
-          champions[id].key,
-          roleId,
-          tierId,
-          patch
-        ).catch(() => null)
-      )
-    );
+    // Fetch matchup + ranking data for each pool champion concurrently
+    const [matchupResults, rankingResults] = await Promise.all([
+      Promise.all(
+        poolIds.map((id) =>
+          fetchChampionMatchups(champions[id].key, roleId, tierId, patch).catch(() => null)
+        )
+      ),
+      Promise.all(
+        poolIds.map((id) =>
+          fetchChampionRankings(champions[id].key, roleId, tierId, patch).catch(() => null)
+        )
+      ),
+    ]);
 
     const results: MatchupResult[] = poolIds.map((id, i) => {
       const champName = champions[id].name;
       const matchups = matchupResults[i];
+      const ranking = rankingResults[i];
       const enemyKeyNum = parseInt(enemyNumericKey, 10);
       const entry = matchups?.[enemyKeyNum] ?? null;
 
@@ -113,9 +117,9 @@ router.post("/", async (req: Request, res: Response) => {
         winRate,
         goldDiff15,
         gamesPlayed,
-        tier: null,       // not available from static matchup JSON
-        pickRate: null,   // not available without total-games-in-patch data
-        banRate: null,    // not available without total-games-in-patch data
+        tier: ranking?.tier ?? null,
+        pickRate: ranking?.pickRate ?? null,
+        banRate: ranking?.banRate ?? null,
         confidence:
           gamesPlayed === null
             ? "no-data"
