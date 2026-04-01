@@ -27,8 +27,13 @@ const PATCHES_URL =
 const WORLD_REGION = "12";
 
 // Second-level key: rank tier.
-// Verified: tier 10 (emerald+) for Darius top gives 311k games at world level.
-// Tier 8 (overall) gives 737k games — confirmed as all ranks combined.
+// Cross-referenced against u.gg website by matching displayed WR% for
+// Darius vs Garen (top) across rank selections:
+//   emerald_plus page shows 48.56% WR → matches rank 17 in JSON
+//   platinum_plus page shows 49.64% WR → matches rank 10 in JSON
+//   diamond_plus page shows 46.75% WR → matches rank 11 in JSON
+//   master_plus page shows 44.84% WR → matches rank 14 in JSON
+//   overall page shows 51.08% WR → matches rank 8 in JSON
 export const RANK_TO_TIER: Record<string, string> = {
   iron: "1",
   bronze: "2",
@@ -38,15 +43,15 @@ export const RANK_TO_TIER: Record<string, string> = {
   emerald: "6",
   diamond: "7",
   overall: "8",
-  master: "9",
-  emerald_plus: "10",
+  platinum_plus: "10",
   diamond_plus: "11",
-  master_plus: "12",
+  master: "12",
   grandmaster: "13",
-  platinum_plus: "14",
+  master_plus: "14",
   gold_plus: "15",
   silver_plus: "16",
-  challenger: "17",
+  emerald_plus: "17",
+  challenger: "13",       // grandmaster+ data (challenger alone is too sparse)
 };
 
 // Third-level key: role (confirmed by checking which key has the most games
@@ -116,7 +121,6 @@ export interface MatchupEntry {
   enemyChampId: number;
   wins: number;
   totalGames: number;
-  goldDiffTotal: number;
   goldDiff15Total: number;
 }
 
@@ -164,7 +168,13 @@ export async function fetchChampionMatchups(
   const result: ChampionMatchups = {};
   for (const entry of entries) {
     if (!Array.isArray(entry) || entry.length < 5) continue;
-    const [champId, wins, totalGames, goldDiffTotal, goldDiff15Total] = entry as number[];
+    const champId = entry[0] as number;
+    const wins = entry[1] as number;
+    const totalGames = entry[2] as number;
+    // field[3] = total gold diff (not GD@15)
+    // field[4] = GD@15 total — verified: Darius vs Garen shows -550/game in JSON,
+    //            matching u.gg counter page exactly
+    const goldDiff15Total = entry[4] as number;
     if (typeof champId !== "number" || typeof totalGames !== "number" || totalGames === 0) {
       continue;
     }
@@ -172,7 +182,6 @@ export async function fetchChampionMatchups(
       enemyChampId: champId,
       wins,
       totalGames,
-      goldDiffTotal,
       goldDiff15Total,
     };
   }
@@ -199,5 +208,5 @@ export function computeWinRate(entry: MatchupEntry): number {
  * values for Darius top emerald+ matchups.
  */
 export function computeGoldDiff15(entry: MatchupEntry): number {
-  return Math.round(entry.goldDiffTotal / entry.totalGames);
+  return Math.round(entry.goldDiff15Total / entry.totalGames);
 }

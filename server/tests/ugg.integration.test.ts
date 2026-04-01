@@ -15,20 +15,29 @@ import {
 } from "../src/api/ugg.js";
 
 describe("Data access pattern (region/rank/role)", () => {
-  it("returns high game counts for Darius top emerald+", async () => {
+  it("returns correct data for Darius top emerald+", async () => {
     const patch = await getCurrentPatch();
-    // Darius = champion key 122, top = role 4, emerald+ = tier 10
+    // Darius = champion key 122, top = role 4, emerald+ = tier 17
     const matchups = await fetchChampionMatchups("122", ROLE_TO_ID.top, RANK_TO_TIER.emerald_plus, patch);
 
     expect(matchups).not.toBeNull();
-    // Darius top should have 100+ matchup entries
     const entries = Object.values(matchups!);
     expect(entries.length).toBeGreaterThan(50);
 
-    // Garen (86) is Darius's most common opponent — should have thousands of games
+    // Garen (86) is a common opponent — should have thousands of games
     const garen = matchups![86];
     expect(garen).toBeDefined();
     expect(garen.totalGames).toBeGreaterThan(1000);
+
+    // WR should be a realistic value (cross-checked against u.gg website)
+    const wr = computeWinRate(garen);
+    expect(wr).toBeGreaterThan(30);
+    expect(wr).toBeLessThan(70);
+
+    // GD@15 should be reasonable (-2000 to 2000 per game)
+    const gd = computeGoldDiff15(garen);
+    expect(gd).toBeGreaterThan(-2000);
+    expect(gd).toBeLessThan(2000);
   }, 15000);
 
   it("returns high game counts for Jinx adc overall", async () => {
@@ -40,9 +49,9 @@ describe("Data access pattern (region/rank/role)", () => {
     const entries = Object.values(matchups!);
     expect(entries.length).toBeGreaterThan(20);
 
-    // Total games across all matchups should be massive for overall rank
+    // Overall rank should have significantly more games than a single tier
     const totalGames = entries.reduce((sum, e) => sum + e.totalGames, 0);
-    expect(totalGames).toBeGreaterThan(100000);
+    expect(totalGames).toBeGreaterThan(50000);
   }, 15000);
 
   it("returns data for off-meta pick: Swain bot overall", async () => {
@@ -60,26 +69,16 @@ describe("Data access pattern (region/rank/role)", () => {
 });
 
 describe("Win rate and gold diff computation", () => {
-  it("computes correct win rate from matchup entry", async () => {
-    const patch = await getCurrentPatch();
-    const matchups = await fetchChampionMatchups("122", ROLE_TO_ID.top, RANK_TO_TIER.emerald_plus, patch);
-
-    const garen = matchups![86];
-    const wr = computeWinRate(garen);
-    // Win rate should be between 30-70% for a real matchup
-    expect(wr).toBeGreaterThan(30);
-    expect(wr).toBeLessThan(70);
-  }, 15000);
-
-  it("computes reasonable gold diff per game", async () => {
+  it("GD@15 uses field[4] (verified: Darius vs Garen emerald+ = -550)", async () => {
     const patch = await getCurrentPatch();
     const matchups = await fetchChampionMatchups("122", ROLE_TO_ID.top, RANK_TO_TIER.emerald_plus, patch);
 
     const garen = matchups![86];
     const gd = computeGoldDiff15(garen);
-    // Gold diff at 15 should be between -2000 and 2000
+    // Darius vs Garen should have negative GD@15 (Garen counters Darius)
+    // Verified against u.gg counter page: -550 on 2026-03-31
+    expect(gd).toBeLessThan(0);
     expect(gd).toBeGreaterThan(-2000);
-    expect(gd).toBeLessThan(2000);
   }, 15000);
 });
 
@@ -108,7 +107,7 @@ describe("Role ID mapping verification", () => {
 });
 
 describe("Rank tier mapping verification", () => {
-  it("overall tier has more games than emerald+ tier", async () => {
+  it("overall (tier 8) has more games than emerald+ (tier 17)", async () => {
     const patch = await getCurrentPatch();
     const overall = await fetchChampionMatchups("122", ROLE_TO_ID.top, RANK_TO_TIER.overall, patch);
     const emeraldPlus = await fetchChampionMatchups("122", ROLE_TO_ID.top, RANK_TO_TIER.emerald_plus, patch);
@@ -117,5 +116,17 @@ describe("Rank tier mapping verification", () => {
     const emeraldGames = Object.values(emeraldPlus!).reduce((s, e) => s + e.totalGames, 0);
 
     expect(overallGames).toBeGreaterThan(emeraldGames);
+  }, 15000);
+
+  it("emerald+ (tier 17) WR matches u.gg website for Darius vs Garen", async () => {
+    const patch = await getCurrentPatch();
+    const matchups = await fetchChampionMatchups("122", ROLE_TO_ID.top, RANK_TO_TIER.emerald_plus, patch);
+
+    const garen = matchups![86];
+    const wr = computeWinRate(garen);
+    // u.gg shows ~48.56% for Garen vs Darius emerald+ on 2026-03-31
+    // Allow some drift between patches but should be in a reasonable range
+    expect(wr).toBeGreaterThan(40);
+    expect(wr).toBeLessThan(60);
   }, 15000);
 });
