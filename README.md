@@ -13,10 +13,6 @@ Enter your champion pool (2-5 champions), pick your lane and rank, then search f
 
 All settings are saved in the URL, so you can bookmark your pool or share it with friends.
 
-## Screenshots
-
-*Coming soon*
-
 ## Tech Stack
 
 | Layer | Technology | Purpose |
