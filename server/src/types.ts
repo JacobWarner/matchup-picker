@@ -24,26 +24,29 @@ export interface MatchupResponse {
   results: MatchupResult[];
 }
 
-export const RANK_MAP: Record<string, string> = {
-  iron: "iron",
-  bronze: "bronze",
-  silver: "silver",
-  gold: "gold",
-  platinum: "platinum",
-  emerald: "emerald",
-  diamond: "diamond",
-  master: "master",
-  grandmaster: "grandmaster",
-  challenger: "challenger",
-  master_plus: "master_plus",
-  diamond_plus: "diamond_plus",
-  emerald_plus: "emerald_plus",
-  platinum_plus: "platinum_plus",
-  gold_plus: "gold_plus",
-  silver_plus: "silver_plus",
-  overall: "overall",
+// Valid rank values accepted by the API.
+// The actual tier ID mapping lives in server/src/api/ugg.ts (RANK_TO_TIER).
+export const RANK_MAP: Record<string, true> = {
+  iron: true,
+  bronze: true,
+  silver: true,
+  gold: true,
+  platinum: true,
+  emerald: true,
+  diamond: true,
+  master: true,
+  grandmaster: true,
+  challenger: true,
+  master_plus: true,
+  diamond_plus: true,
+  emerald_plus: true,
+  platinum_plus: true,
+  gold_plus: true,
+  silver_plus: true,
+  overall: true,
 };
 
+// Maps frontend lane keys to u.gg role names (which then map to role IDs in ugg.ts).
 export const LANE_MAP: Record<string, string> = {
   top: "top",
   jungle: "jungle",

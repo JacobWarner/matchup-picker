@@ -1,6 +1,6 @@
 export interface ChampionEntry {
   id: string;
-  key: string;
+  key: string;   // numeric champion key as a string, e.g. "122" for Darius
   name: string;
   image: { full: string };
 }

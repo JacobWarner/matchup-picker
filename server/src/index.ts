@@ -3,7 +3,6 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import matchupRouter from "./routes/matchup.js";
-import { closeBrowser } from "./scraper/browser.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,11 +28,12 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-async function shutdown() {
+process.on("SIGTERM", () => {
   console.log("Shutting down...");
-  await closeBrowser();
   process.exit(0);
-}
+});
 
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
+process.on("SIGINT", () => {
+  console.log("Shutting down...");
+  process.exit(0);
+});

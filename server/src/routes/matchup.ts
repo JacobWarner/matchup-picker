@@ -1,11 +1,15 @@
 import { Router, Request, Response } from "express";
-import { scrapeCounterPage } from "../scraper/counterPage.js";
-import { scrapeBuildPage } from "../scraper/buildPage.js";
+import {
+  fetchChampionMatchups,
+  computeWinRate,
+  computeGoldDiff15,
+  getCurrentPatch,
+  RANK_TO_TIER,
+  ROLE_TO_ID,
+} from "../api/ugg.js";
 import {
   fetchChampions,
   findChampionId,
-  toUggName,
-  normalizeChampionName,
 } from "../champions.js";
 import {
   MatchupRequest,
@@ -65,38 +69,41 @@ router.post("/", async (req: Request, res: Response) => {
       return;
     }
 
-    const uggLane = LANE_MAP[lane];
-    const uggRank = RANK_MAP[rank];
-    const enemyNormalized = normalizeChampionName(champions[enemyId].name);
+    // Resolve rank and role to API IDs
+    const uggLane = LANE_MAP[lane];       // e.g. "top"
+    const roleId = ROLE_TO_ID[uggLane];  // e.g. "4"
+    const tierId = RANK_TO_TIER[rank];   // e.g. "10"
 
-    // Scrape each POOL CHAMPION's counter page (not the enemy's).
-    // The enemy's counter page only lists champions commonly played in that role,
-    // so off-meta picks (e.g. Swain bot) would be missing. By scraping each pool
-    // champion's page, we find the enemy in THEIR matchup lists instead.
-    const scrapeResults = await Promise.all([
-      ...poolIds.map((id) => scrapeCounterPage(toUggName(id), uggLane, uggRank)),
-      ...poolIds.map((id) => scrapeBuildPage(toUggName(id), uggLane, uggRank)),
-    ]);
+    // Get the enemy's numeric champion key (used as the lookup key in matchup data)
+    const enemyNumericKey = champions[enemyId].key;
 
-    const counterResults = scrapeResults.slice(0, poolIds.length) as Awaited<ReturnType<typeof scrapeCounterPage>>[];
-    const buildResults = scrapeResults.slice(poolIds.length) as Awaited<ReturnType<typeof scrapeBuildPage>>[];
+    // Fetch the current patch dynamically
+    const patch = await getCurrentPatch();
+
+    // Fetch matchup data for each pool champion concurrently
+    const matchupResults = await Promise.all(
+      poolIds.map((id) =>
+        fetchChampionMatchups(
+          champions[id].key,
+          roleId,
+          tierId,
+          patch
+        ).catch(() => null)
+      )
+    );
 
     const results: MatchupResult[] = poolIds.map((id, i) => {
       const champName = champions[id].name;
-      const counterData = counterResults[i];
-      const enemyEntry = counterData[enemyNormalized] ?? null;
-      const build = buildResults[i];
-      const gamesPlayed = enemyEntry?.gamesPlayed ?? null;
+      const matchups = matchupResults[i];
+      const enemyKeyNum = parseInt(enemyNumericKey, 10);
+      const entry = matchups?.[enemyKeyNum] ?? null;
 
-      // Counter page shows stats from the OPPONENT's perspective:
-      // "Best Picks vs Swain" shows opponents that beat Swain, with the opponent's WR.
-      // So we invert: poolChampWR = 100 - enemyWR, and poolChampGD = -enemyGD.
-      const winRate = enemyEntry?.winRate != null
-        ? Math.round((100 - enemyEntry.winRate) * 100) / 100
-        : null;
-      const goldDiff15 = enemyEntry?.goldDiff15 != null
-        ? -enemyEntry.goldDiff15
-        : null;
+      const gamesPlayed = entry?.totalGames ?? null;
+
+      // matchup data is from the pool champion's perspective:
+      // wins = pool champion's wins vs the enemy → no inversion needed
+      const winRate = entry ? computeWinRate(entry) : null;
+      const goldDiff15 = entry ? computeGoldDiff15(entry) : null;
 
       return {
         champion: champName,
@@ -104,9 +111,9 @@ router.post("/", async (req: Request, res: Response) => {
         winRate,
         goldDiff15,
         gamesPlayed,
-        tier: build.tier,
-        pickRate: build.pickRate,
-        banRate: build.banRate,
+        tier: null,       // not available from static matchup JSON
+        pickRate: null,   // not available without total-games-in-patch data
+        banRate: null,    // not available without total-games-in-patch data
         confidence:
           gamesPlayed === null
             ? "no-data"
@@ -133,15 +140,8 @@ router.post("/", async (req: Request, res: Response) => {
     res.json(response);
   } catch (err) {
     console.error("Matchup error:", err);
-
     const message = err instanceof Error ? err.message : "Unknown error";
-    if (message.includes("rate limited") || message.includes("bot detection")) {
-      res.status(429).json({ error: message });
-    } else if (message.includes("page structure may have changed")) {
-      res.status(502).json({ error: message });
-    } else {
-      res.status(500).json({ error: `Failed to fetch matchup data: ${message}` });
-    }
+    res.status(500).json({ error: `Failed to fetch matchup data: ${message}` });
   }
 });
 

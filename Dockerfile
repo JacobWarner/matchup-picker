@@ -16,25 +16,21 @@ COPY server/ ./
 COPY tsconfig.base.json /app/
 RUN npm run build
 
-# Stage 3: Production image with Playwright Chromium
-FROM mcr.microsoft.com/playwright:v1.49.1-noble
+# Stage 3: Production image — no Chromium, just Node
+FROM node:20-bookworm-slim
 WORKDIR /app
 
 # Copy built client
 COPY --from=client-build /app/client/dist ./client/dist
 
-# Copy server source and install production deps
+# Install production server dependencies
 COPY server/package.json server/package-lock.json* ./server/
 WORKDIR /app/server
 RUN npm install --omit=dev
 
-# Use the Chromium that comes with the base image
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-
 # Copy compiled server
 COPY --from=server-build /app/server/dist ./dist
 
-WORKDIR /app/server
 ENV NODE_ENV=production
 EXPOSE 10000
 CMD ["node", "dist/index.js"]
