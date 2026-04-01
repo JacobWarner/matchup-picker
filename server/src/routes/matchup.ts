@@ -77,8 +77,10 @@ router.post("/", async (req: Request, res: Response) => {
     // Get the enemy's numeric champion key (used as the lookup key in matchup data)
     const enemyNumericKey = champions[enemyId].key;
 
-    // Fetch the current patch dynamically
-    const patch = await getCurrentPatch();
+    // Use provided patch or fall back to current
+    const patch = (req.body.patch && typeof req.body.patch === "string")
+      ? req.body.patch
+      : await getCurrentPatch();
 
     // Fetch matchup data for each pool champion concurrently
     const matchupResults = await Promise.all(

@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Champion, Lane, MatchupResult } from "./types";
 import { loadChampions } from "./champions";
-import { fetchMatchup } from "./api";
+import { fetchMatchup, fetchPatches } from "./api";
 import ChampionPoolInput from "./components/ChampionPoolInput";
 import LaneSelector from "./components/LaneSelector";
 import RankDropdown from "./components/RankDropdown";
+import PatchSelector from "./components/PatchSelector";
 import EnemyInput from "./components/EnemyInput";
 import ResultCard from "./components/ResultCard";
 
@@ -12,21 +13,24 @@ function getUrlParams(): {
   pool: string[];
   lane: Lane;
   rank: string;
+  patch: string;
   enemy: string;
 } {
   const params = new URLSearchParams(window.location.search);
   const pool = params.get("pool")?.split(",").filter(Boolean) ?? [];
   const lane = (params.get("lane") as Lane) ?? "top";
   const rank = params.get("rank") ?? "emerald_plus";
+  const patch = params.get("patch") ?? "";
   const enemy = params.get("enemy") ?? "";
-  return { pool, lane, rank, enemy };
+  return { pool, lane, rank, patch, enemy };
 }
 
-function setUrlParams(pool: string[], lane: string, rank: string, enemy: string) {
+function setUrlParams(pool: string[], lane: string, rank: string, patch: string, enemy: string) {
   const params = new URLSearchParams();
   if (pool.length > 0) params.set("pool", pool.join(","));
   if (lane) params.set("lane", lane);
   if (rank) params.set("rank", rank);
+  if (patch) params.set("patch", patch);
   if (enemy) params.set("enemy", enemy);
   const newUrl = `${window.location.pathname}?${params.toString()}`;
   window.history.replaceState({}, "", newUrl);
@@ -34,23 +38,26 @@ function setUrlParams(pool: string[], lane: string, rank: string, enemy: string)
 
 export default function App() {
   const [allChampions, setAllChampions] = useState<Champion[]>([]);
+  const [patches, setPatches] = useState<string[]>([]);
   const [pool, setPool] = useState<Champion[]>([]);
   const [lane, setLane] = useState<Lane>("top");
   const [rank, setRank] = useState("emerald_plus");
+  const [patch, setPatch] = useState("");
   const [results, setResults] = useState<MatchupResult[] | null>(null);
   const [enemyName, setEnemyName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [championsLoaded, setChampionsLoaded] = useState(false);
 
-  // Load champions from Data Dragon on mount
+  // Load champions and patches on mount
   useEffect(() => {
-    loadChampions()
-      .then((champs) => {
-        setAllChampions(champs);
+    const params = getUrlParams();
 
-        // Restore state from URL params
-        const params = getUrlParams();
+    Promise.all([loadChampions(), fetchPatches()])
+      .then(([champs, patchList]) => {
+        setAllChampions(champs);
+        setPatches(patchList);
+
         const restored = params.pool
           .map((name) => champs.find(
             (c) => c.id === name || c.name.toLowerCase() === name.toLowerCase()
@@ -59,11 +66,12 @@ export default function App() {
         setPool(restored);
         setLane(params.lane);
         setRank(params.rank);
+        setPatch(params.patch || patchList[0] || "");
         setEnemyName(params.enemy);
         setChampionsLoaded(true);
       })
       .catch((err) => {
-        setError(`Failed to load champion data: ${err instanceof Error ? err.message : "Unknown error"}`);
+        setError(`Failed to load data: ${err instanceof Error ? err.message : "Unknown error"}`);
       });
   }, []);
 
@@ -74,9 +82,10 @@ export default function App() {
       pool.map((c) => c.id),
       lane,
       rank,
+      patch,
       enemyName
     );
-  }, [pool, lane, rank, enemyName, championsLoaded]);
+  }, [pool, lane, rank, patch, enemyName, championsLoaded]);
 
   const handleAddChampion = useCallback((champ: Champion) => {
     setPool((prev) => {
@@ -105,7 +114,8 @@ export default function App() {
         pool.map((c) => c.id),
         enemy.id,
         lane,
-        rank
+        rank,
+        patch
       );
       setResults(response.results);
     } catch (err) {
@@ -139,6 +149,9 @@ export default function App() {
         <div className="lane-rank-row">
           <LaneSelector selected={lane} onChange={setLane} />
           <RankDropdown selected={rank} onChange={setRank} />
+          {patches.length > 0 && (
+            <PatchSelector patches={patches} selected={patch} onChange={setPatch} />
+          )}
         </div>
 
         <EnemyInput
@@ -153,7 +166,7 @@ export default function App() {
           <div className="results">
             <div className="results-header">
               Results — Your Pool vs {enemyName} ({lane.toUpperCase()},{" "}
-              {rank.replace("_", " ")})
+              {rank.replace("_", " ")}, Patch {patch.replace("_", ".")})
             </div>
             {results.map((r, i) => (
               <ResultCard

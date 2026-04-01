@@ -61,13 +61,13 @@ export const ROLE_TO_ID: Record<string, string> = {
 // Patch helpers
 // ---------------------------------------------------------------------------
 
-let cachedPatch: string | null = null;
+let cachedPatches: string[] | null = null;
 let patchCacheTimestamp = 0;
 const PATCH_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-export async function getCurrentPatch(): Promise<string> {
-  if (cachedPatch && Date.now() - patchCacheTimestamp < PATCH_CACHE_TTL_MS) {
-    return cachedPatch;
+export async function getPatches(): Promise<string[]> {
+  if (cachedPatches && Date.now() - patchCacheTimestamp < PATCH_CACHE_TTL_MS) {
+    return cachedPatches;
   }
 
   const res = await fetch(PATCHES_URL);
@@ -79,10 +79,15 @@ export async function getCurrentPatch(): Promise<string> {
     throw new Error("u.gg patches list is empty");
   }
 
-  // Patches are already in the API key format: "16_6"
-  cachedPatch = patches[0];
+  // Patches are in API key format: "16_6"
+  cachedPatches = patches;
   patchCacheTimestamp = Date.now();
-  return cachedPatch;
+  return cachedPatches;
+}
+
+export async function getCurrentPatch(): Promise<string> {
+  const patches = await getPatches();
+  return patches[0];
 }
 
 // ---------------------------------------------------------------------------
